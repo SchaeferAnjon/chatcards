@@ -107,7 +107,7 @@ final class AppModel: ObservableObject {
             if let info = ClaudeSessions.find(remoteID: remoteID) {
                 importSession(info)
             } else {
-                webImport = WebImport(url: url, note: "这个会话不在这台 Mac 上，在网页里打开它（第一次要登录 claude.ai），对话出来以后点「用这页做卡片」。")
+                webImport = WebImport(url: url, note: "这个会话不在这台 Mac 上，在网页里打开它。第一次要登录 claude.ai：用邮箱或 Apple 登录，Google 登录在这里会被 Google 拦下。对话出来以后点「用这页做卡片」。")
             }
         case .localSession(let id):
             if let info = ClaudeSessions.find(sessionID: id) {
@@ -118,7 +118,7 @@ final class AppModel: ObservableObject {
         case .file(let url):
             importFile(url)
         case .web(let url):
-            webImport = WebImport(url: url, note: "网页打开以后点「用这页做卡片」。要登录的网站先在这里登录。")
+            webImport = WebImport(url: url, note: "网页打开以后点「用这页做卡片」。要登录的网站先在这里登录（Google 账号登录在这里会被 Google 拦下，用邮箱或别的方式）。")
         case nil:
             show(Toast(ok: false, title: "认不出这是什么", detail: "粘贴 claude.ai/code 的会话链接、文件路径或网址"))
         }

@@ -44,22 +44,46 @@ struct WebImportView: View {
 }
 
 @MainActor
-final class ImportPage: NSObject, ObservableObject, WKNavigationDelegate {
+final class ImportPage: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
     let view: WKWebView
     @Published var loading = true
+    /// 网页自己开的小窗（Apple 登录这类）：放进一个独立窗口，关掉时网页会把结果传回原页
+    private var popups: [NSWindow] = []
 
     override init() {
         let config = WKWebViewConfiguration()
         // 用默认的数据仓：登录过一次，下次还在
         config.websiteDataStore = .default()
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
         view = WKWebView(frame: .zero, configuration: config)
         super.init()
         view.navigationDelegate = self
+        view.uiDelegate = self
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { loading = true }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { loading = false }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { loading = false }
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        let popup = WKWebView(frame: NSRect(x: 0, y: 0, width: 520, height: 680), configuration: configuration)
+        popup.uiDelegate = self
+        let window = NSWindow(contentRect: popup.frame, styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.title = "登录"
+        window.contentView = popup
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        popups.append(window)
+        return popup
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        guard let window = popups.first(where: { $0.contentView === webView }) else { return }
+        window.close()
+        popups.removeAll { $0 === window }
+    }
 }
 
 struct WebViewBox: NSViewRepresentable {
