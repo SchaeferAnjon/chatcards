@@ -129,10 +129,43 @@ func deepSeekReply(_ content: String) -> [String: Any] {
         #expect(fields["问题"] == "新的")
         #expect(fields["答案"] == "<code>a</code>")
         #expect(fields["来源"]?.contains("会话 &lt;1&gt;") == true)
-        #expect(fields["来源"]?.range(of: #"· \d{4}-\d{2}-\d{2} ·"#, options: .regularExpression) != nil)
-        #expect(fields["来源"]?.contains("href=\"https://claude.ai/code/session_x\"") == true)
+        #expect(fields["来源"]?.range(of: #"<span class="src-date">\d{4}-\d{2}-\d{2}</span>"#, options: .regularExpression) != nil)
+        #expect(fields["来源"]?.contains(#"<a class="src-link" href="https://claude.ai/code/session_x">打开原文</a>"#) == true)
         #expect(notes[0]["tags"] as? [String] == ["anki-learn", "git_tips"])
         #expect(notes[0]["deckName"] as? String == "Anki Learn::Claude Code")
+    }
+
+    @Test func ankiUpgradesOldNoteTypeOnce() async throws {
+        for (css, expectUpdate) in [("/* old */ .card {}", true), (AnkiNoteType.css, false)] {
+            StubProtocol.bodies = []
+            StubProtocol.handler = { body in
+                switch body["action"] as? String {
+                case "version": return (200, ["result": 6, "error": NSNull()])
+                case "createDeck": return (200, ["result": 1, "error": NSNull()])
+                case "modelNames": return (200, ["result": [AnkiNoteType.name], "error": NSNull()])
+                case "modelStyling": return (200, ["result": ["css": css], "error": NSNull()])
+                case "updateModelStyling", "updateModelTemplates": return (200, ["result": NSNull(), "error": NSNull()])
+                case "canAddNotesWithErrorDetail": return (200, ["result": [["canAdd": true]], "error": NSNull()])
+                case "addNotes": return (200, ["result": [1], "error": NSNull()])
+                default: return (200, ["result": NSNull(), "error": "unknown action"])
+                }
+            }
+            let source = Source(kind: .document, title: "笔记.pdf", origin: "/tmp/笔记.pdf")
+            _ = try await AnkiConnect(session: StubProtocol.session()).add([Card(CardDraft(q: "q", a: "a"))], from: source, deck: "d")
+            let actions = StubProtocol.bodies.compactMap { $0["action"] as? String }
+            #expect(actions.contains("createModel") == false)
+            #expect(actions.contains("updateModelStyling") == expectUpdate)
+            #expect(actions.contains("updateModelTemplates") == expectUpdate)
+            if expectUpdate {
+                let t = try #require(StubProtocol.bodies.first { $0["action"] as? String == "updateModelTemplates" }?["params"] as? [String: Any])
+                let templates = try #require((t["model"] as? [String: Any])?["templates"] as? [String: [String: String]])
+                #expect(templates["问答"]?["Back"]?.contains("原话") == true)
+            }
+            // 没有链接的文档：来源里没有「打开原文」
+            let added = try #require(StubProtocol.bodies.last?["params"] as? [String: Any])
+            let fields = try #require((added["notes"] as? [[String: Any]])?.first?["fields"] as? [String: String])
+            #expect(fields["来源"]?.contains("src-link") == false)
+        }
     }
 
     @Test func ankiNotRunning() async {

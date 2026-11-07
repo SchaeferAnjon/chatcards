@@ -3,3 +3,4 @@
 build/
 Core/.build/
 Core/.swiftpm/
+design/

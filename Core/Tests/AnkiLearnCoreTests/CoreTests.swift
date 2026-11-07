@@ -144,6 +144,20 @@ func makeRoot() throws -> URL {
         #expect(CardMaker.dedupe(cards).map(\.a) == ["1", "3"])
     }
 
+    @Test func pointsForAnki() {
+        #expect(AnkiHTML.points("只有一条 `x`") == "只有一条 <code>x</code>")
+        #expect(AnkiHTML.points("- 第一条\n\n• 第二条 <b>") == "<ul class=\"pts\"><li>第一条</li><li>第二条 &lt;b&gt;</li></ul>")
+        #expect(AnkiHTML.points("") == "")
+    }
+
+    @Test func noteTypeIsVersioned() {
+        #expect(AnkiNoteType.css.hasPrefix("/* \(AnkiNoteType.version)"))
+        #expect(!AnkiNoteType.back.contains("id=\"answer\""))
+        for field in AnkiNoteType.fieldNames where field != "原文" && field != "补充" {
+            #expect(AnkiNoteType.back.contains("{{\(field)}}"))
+        }
+    }
+
     @Test func htmlForAnki() {
         #expect(AnkiHTML.from("用 `a<b>` 和 **重点**\n第二行") == "用 <code>a&lt;b&gt;</code> 和 <b>重点</b><br>第二行")
     }

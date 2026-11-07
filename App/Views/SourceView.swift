@@ -255,7 +255,16 @@ struct CardRow: View {
             Text(card.q).font(.system(size: 14, weight: .medium)).fixedSize(horizontal: false, vertical: true)
             Text(card.a).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
             if !card.more.isEmpty {
-                Text(card.more).font(.system(size: 12)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
+                let points = card.more.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            if points.count > 1 { Text("•").foregroundStyle(Theme.text3) }
+                            Text(point).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .font(.system(size: 12))
             }
             if !card.quote.isEmpty {
                 HStack(alignment: .top, spacing: 8) {
