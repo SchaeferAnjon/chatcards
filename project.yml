@@ -1,0 +1,44 @@
+name: AnkiLearn
+options:
+  bundleIdPrefix: com.ankilearn
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+packages:
+  AnkiLearnCore:
+    path: Core
+targets:
+  AnkiLearn:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - package: AnkiLearnCore
+        product: AnkiLearnCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Anki Learn
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleLocalizations: [zh-Hans]
+        LSApplicationCategoryType: public.app-category.education
+        CFBundleURLTypes:
+          - CFBundleURLName: com.ankilearn.app
+            CFBundleURLSchemes: [ankilearn]
+    settings:
+      base:
+        PRODUCT_NAME: Anki Learn
+        EXECUTABLE_NAME: AnkiLearn
+        PRODUCT_MODULE_NAME: AnkiLearn
+        PRODUCT_BUNDLE_IDENTIFIER: com.ankilearn.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        ARCHS: arm64
+        ONLY_ACTIVE_ARCH: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: TEAMID
+        CODE_SIGN_IDENTITY: "Apple Development"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
