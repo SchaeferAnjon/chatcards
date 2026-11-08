@@ -43,6 +43,26 @@ struct ContentView: View {
         .sheet(item: $model.webImport) { item in
             WebImportView(item: item)
         }
+        .sheet(isPresented: $model.connectShown) {
+            VStack(spacing: 0) {
+                ConnectAnkiView()
+                Rectangle().fill(Theme.line).frame(height: 0.5)
+                HStack {
+                    Spacer()
+                    Button("好了") { model.connectShown = false }.keyboardShortcut(.defaultAction)
+                }
+                .padding(16)
+            }
+            .frame(width: 600)
+            .environmentObject(model)
+        }
+        .alert("「学习卡 · 问答」的样子你在 Anki 里改过", isPresented: Binding(get: { model.styleQuestion != nil }, set: { if !$0 { model.styleQuestion = nil } })) {
+            Button("换成新样子") { model.answerStyleQuestion(replace: true) }
+            Button("留着我改的") { model.answerStyleQuestion(replace: false) }
+            Button("先不送", role: .cancel) { model.styleQuestion = nil }
+        } message: {
+            Text("换成新样子会盖掉你改的模板和样式，卡片内容不变。选好以后不再问；Ask Free、GetNewWord 也用这个笔记类型。")
+        }
     }
 }
 
@@ -130,8 +150,8 @@ struct ToastView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                if let id = toast.retrySend {
-                    Button("打开 Anki 再送") { model.openAnkiThenSend(id) }
+                if let action = toast.action {
+                    Button(label(action)) { model.perform(action) }
                         .buttonStyle(QuietButtonStyle())
                 }
                 Button {
@@ -152,6 +172,14 @@ struct ToastView: View {
             .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
             .padding(.bottom, 64)
             .transition(.opacity)
+        }
+    }
+
+    private func label(_ action: AppModel.Toast.Action) -> String {
+        switch action {
+        case .openAnkiThenSend: return "打开 Anki 再送"
+        case .howToInstall: return "怎么装"
+        case .browse: return "在 Anki 里看"
         }
     }
 }

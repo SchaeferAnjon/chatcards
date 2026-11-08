@@ -6,13 +6,37 @@ import SwiftUI
 enum Prefs {
     static let modelKey = "model"
     static let thinkingKey = "thinking"
-    static let deckKey = "deckRoot"
+    /// 卡片默认进的牌组；建好以后按 id 记，你在 Anki 里改名也跟得上
+    static let deckKey = "ankiDeck"
+    static let deckIDKey = "ankiDeckID"
+    /// 你在 Anki 里改过「学习卡 · 问答」的模板时选的：replace 换成新样子，keep 留着你改的
+    static let styleKey = "ankiCustomizedStyle"
+    static let defaultDeck = "知识"
 
     static var model: String { UserDefaults.standard.string(forKey: modelKey) ?? "deepseek-flash" }
     static var thinking: Bool { UserDefaults.standard.object(forKey: thinkingKey) as? Bool ?? true }
-    static var deckRoot: String {
+    static var deckName: String {
         let s = UserDefaults.standard.string(forKey: deckKey)?.trimmingCharacters(in: .whitespaces) ?? ""
-        return s.isEmpty ? "Anki Learn" : s
+        return s.isEmpty ? defaultDeck : s
+    }
+    static var deckID: Int? {
+        get { UserDefaults.standard.object(forKey: deckIDKey) as? Int }
+        set { UserDefaults.standard.set(newValue, forKey: deckIDKey) }
+    }
+    /// 你在 Anki 里改了默认牌组的名字：设置里也跟着写新名字
+    static func followRename(_ name: String) {
+        if name != deckName { UserDefaults.standard.set(name, forKey: deckKey) }
+    }
+    /// 设置里改了名字：下次送卡按新名字找或建
+    static func setDeck(_ name: String) {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        guard name != deckName else { return }
+        UserDefaults.standard.set(name.isEmpty ? nil : name, forKey: deckKey)
+        deckID = nil
+    }
+    static var customizedStyle: CustomizedStyle {
+        get { UserDefaults.standard.string(forKey: styleKey).flatMap(CustomizedStyle.init) ?? .ask }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: styleKey) }
     }
 }
 
@@ -31,12 +55,20 @@ final class AppModel: ObservableObject {
     }
 
     struct Toast: Identifiable, Equatable {
+        enum Action: Equatable {
+            /// Anki 没开：「打开 Anki 再送」
+            case openAnkiThenSend(UUID)
+            /// 连不上插件：「怎么装」打开连上 Anki 那一块
+            case howToInstall
+            /// 送好了：「在 Anki 里看」
+            case browse(UUID)
+        }
+
         let id = UUID()
         var ok: Bool
         var title: String
         var detail: String?
-        /// Anki 没开时带一个「打开 Anki 再送」
-        var retrySend: UUID?
+        var action: Action?
     }
 
     struct WebImport: Identifiable {
@@ -53,6 +85,15 @@ final class AppModel: ObservableObject {
     @Published var sending: Set<UUID> = []
     @Published var toast: Toast?
     @Published var webImport: WebImport?
+    /// 「连上 Anki」那一块（提示条上点「怎么装」）
+    @Published var connectShown = false
+    /// 你在 Anki 里改过模板：问换不换，答了再送这份材料
+    @Published var styleQuestion: UUID?
+    /// 默认牌组现在在 Anki 里叫什么，和底栏菜单里能选的（默认的和它下面你自己建的）
+    @Published var topDeck = Prefs.deckName
+    @Published var deckChoices: [String] = [Prefs.deckName]
+    /// 底栏菜单里选的；nil 就是默认牌组
+    @Published var chosenDeck: String?
 
     private let store = SourceStore(url: SourceStore.defaultURL)
     private var toastTask: Task<Void, Never>?
@@ -240,11 +281,23 @@ final class AppModel: ObservableObject {
 
     // MARK: - 送进 Anki
 
-    func deck(for source: Source) -> String {
-        switch source.kind {
-        case .claudeSession: return "\(Prefs.deckRoot)::Claude Code"
-        case .document: return "\(Prefs.deckRoot)::文档"
-        case .web: return "\(Prefs.deckRoot)::网页"
+    var deckForSending: String { chosenDeck ?? topDeck }
+
+    /// 读 Anki 里的牌组：默认的那个按 id 找现在的名字，再列出它下面你自己建的
+    func refreshDecks() {
+        Task {
+            do {
+                let decks = try await AnkiConnect().deckNamesAndIds()
+                let top = Prefs.deckID.flatMap { id in decks.first { $0.value == id }?.key } ?? Prefs.deckName
+                Prefs.followRename(top)
+                topDeck = top
+                deckChoices = [top] + decks.keys.filter { $0.hasPrefix(top + "::") }.sorted()
+                if let chosen = chosenDeck, !deckChoices.contains(chosen) { chosenDeck = nil }
+            } catch AnkiError.notRunning {
+                // Anki 没开：菜单里只有默认的，送的时候再说
+            } catch {
+                show(Toast(ok: false, title: "读不到 Anki 里的牌组", detail: error.localizedDescription))
+            }
         }
     }
 
@@ -253,11 +306,23 @@ final class AppModel: ObservableObject {
         let cards = source.cards.filter { $0.selected && !$0.inAnki }
         guard !cards.isEmpty else { return }
         sending.insert(id)
-        let deck = deck(for: source)
+        let chosen = chosenDeck
         Task {
             defer { sending.remove(id) }
+            let anki = AnkiConnect()
             do {
-                let result = try await AnkiConnect().add(cards, from: source, deck: deck)
+                _ = try await anki.version()
+                let deck: String
+                if let chosen {
+                    deck = chosen
+                } else {
+                    let top = try await anki.deck(id: Prefs.deckID, orCreate: Prefs.deckName)
+                    Prefs.deckID = top.id
+                    Prefs.followRename(top.name)
+                    topDeck = top.name
+                    deck = top.name
+                }
+                let result = try await anki.add(cards, from: source, deck: deck, customized: Prefs.customizedStyle)
                 guard let i = sources.firstIndex(where: { $0.id == id }) else { return }
                 let done = Set(result.added + result.duplicates)
                 for j in sources[i].cards.indices where done.contains(sources[i].cards[j].id) {
@@ -267,25 +332,52 @@ final class AppModel: ObservableObject {
                 var parts: [String] = []
                 if !result.duplicates.isEmpty { parts.append("\(result.duplicates.count) 张 Anki 里已经有了，跳过") }
                 if !result.failed.isEmpty { parts.append("\(result.failed.count) 张没加进去：\(result.failed.values.first ?? "")") }
-                show(Toast(ok: result.failed.isEmpty, title: "加了 \(result.added.count) 张到「\(deck)」", detail: parts.isEmpty ? nil : parts.joined(separator: "；")))
+                if parts.isEmpty { parts.append("来源和主题写进了标签") }
+                show(Toast(ok: result.failed.isEmpty, title: "加了 \(result.added.count) 张到「\(deck)」", detail: parts.joined(separator: "；"),
+                           action: result.added.isEmpty && result.duplicates.isEmpty ? nil : .browse(id)))
             } catch AnkiError.notRunning {
-                show(Toast(ok: false, title: "Anki 没开着，卡片还没送进去", detail: "要先打开 Anki（装了 AnkiConnect 插件）", retrySend: id))
+                if Self.ankiIsRunning {
+                    show(Toast(ok: false, title: "Anki 开着，但连不上 AnkiConnect 插件", detail: "装好插件、重启 Anki 再送，勾着的都还在。", action: .howToInstall))
+                } else {
+                    show(Toast(ok: false, title: "Anki 没开着，卡片还没送进去", detail: "打开 Anki 就能送，勾着的都还在。", action: .openAnkiThenSend(id)))
+                }
+            } catch AnkiError.customizedStyle {
+                styleQuestion = id
             } catch {
                 show(Toast(ok: false, title: "没送进 Anki", detail: error.localizedDescription))
             }
         }
     }
 
-    /// 打开 Anki，等 AnkiConnect 能连上（最多 30 秒）再送
-    func openAnkiThenSend(_ id: UUID) {
-        toast = nil
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "net.ankiweb.anki") else {
-            show(Toast(ok: false, title: "这台 Mac 上没找到 Anki", detail: "去 apps.ankiweb.net 下载"))
-            return
+    /// 你在 Anki 里改过「学习卡 · 问答」的模板：答了以后记下来，不再问，接着送
+    func answerStyleQuestion(replace: Bool) {
+        Prefs.customizedStyle = replace ? .replace : .keep
+        if let id = styleQuestion {
+            styleQuestion = nil
+            send(id)
+        }
+    }
+
+    nonisolated static let ankiBundleID = "net.ankiweb.anki"
+    static var ankiIsRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: ankiBundleID).isEmpty }
+
+    /// 打开 Anki（不抢到前面）；没装就去下载页
+    @discardableResult
+    func openAnki() -> Bool {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.ankiBundleID) else {
+            show(Toast(ok: false, title: "这台 Mac 上没找到 Anki", detail: "去 apps.ankiweb.net 下载", action: .howToInstall))
+            return false
         }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
         NSWorkspace.shared.openApplication(at: url, configuration: config)
+        return true
+    }
+
+    /// 打开 Anki，等 AnkiConnect 能连上（最多 30 秒）再送
+    func openAnkiThenSend(_ id: UUID) {
+        toast = nil
+        guard openAnki() else { return }
         sending.insert(id)
         Task {
             let anki = AnkiConnect()
@@ -298,19 +390,30 @@ final class AppModel: ObservableObject {
                 try? await Task.sleep(for: .seconds(1))
             }
             sending.remove(id)
-            show(Toast(ok: false, title: "Anki 开了，但连不上 AnkiConnect", detail: "在 Anki 的「工具 › 附加组件」里看看 AnkiConnect 装了没有"))
+            show(Toast(ok: false, title: "Anki 开着，但连不上 AnkiConnect 插件", detail: "装好插件、重启 Anki 再送，勾着的都还在。", action: .howToInstall))
         }
     }
 
+    /// 在 Anki 的卡片浏览器里只看这份材料送进去的卡
     func browseInAnki(_ id: UUID) {
         guard let source = source(id) else { return }
-        let deck = deck(for: source)
+        let cards = source.cards.filter(\.inAnki)
+        guard !cards.isEmpty else { return }
         Task {
             do {
-                try await AnkiConnect().browse(deck: deck)
+                try await AnkiConnect().browse(query: AnkiConnect.query(for: cards))
             } catch {
                 show(Toast(ok: false, title: "打不开 Anki 的卡片浏览器", detail: error.localizedDescription))
             }
+        }
+    }
+
+    func perform(_ action: Toast.Action) {
+        toast = nil
+        switch action {
+        case .openAnkiThenSend(let id): openAnkiThenSend(id)
+        case .howToInstall: connectShown = true
+        case .browse(let id): browseInAnki(id)
         }
     }
 
@@ -321,7 +424,7 @@ final class AppModel: ObservableObject {
         toastTask?.cancel()
         let id = t.id
         toastTask = Task {
-            try? await Task.sleep(for: .seconds(t.retrySend == nil ? (t.ok ? 5 : 6) : 15))
+            try? await Task.sleep(for: .seconds(t.action == nil ? (t.ok ? 5 : 6) : 15))
             if !Task.isCancelled, toast?.id == id { toast = nil }
         }
     }

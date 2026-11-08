@@ -121,40 +121,74 @@ struct SourceView: View {
 
     // MARK: 底栏
 
-    private var bottomBar: some View {
-        HStack(spacing: 14) {
-            Button {
-                let all = chosen < pending.count
-                for i in source.cards.indices where !source.cards[i].inAnki { source.cards[i].selected = all }
-            } label: {
-                HStack(spacing: 6) {
-                    CheckBox(on: chosen > 0 && chosen == pending.count)
-                    Text("全选").font(.system(size: 13))
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(pending.isEmpty)
+    private var inAnkiCount: Int { source.cards.count - pending.count }
 
-            Text(pending.isEmpty ? "都在 Anki 里了" : "已选 \(chosen) 张，共 \(pending.count) 张没送")
-                .font(.system(size: 12)).foregroundStyle(Theme.text2)
-                .monospacedDigit()
-            Spacer()
-            Text("牌组 \(model.deck(for: source))").font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
-            Button {
-                model.send(source.id)
-            } label: {
-                if model.sending.contains(source.id) {
-                    HStack(spacing: 6) { ProgressView().controlSize(.small).tint(Theme.onInk); Text("正在送…") }
-                } else {
-                    Text("送进 Anki")
+    @ViewBuilder
+    private var bottomBar: some View {
+        HStack(spacing: 12) {
+            if pending.isEmpty {
+                HStack(spacing: 8) {
+                    Dot(color: Theme.ok)
+                    Text("\(source.cards.count) 张都在 Anki 里了").font(.system(size: 13))
                 }
+                Spacer()
+                Button("在 Anki 里看") { model.browseInAnki(source.id) }
+                    .buttonStyle(OutlineButtonStyle())
+            } else {
+                Button {
+                    let all = chosen < pending.count
+                    for i in source.cards.indices where !source.cards[i].inAnki { source.cards[i].selected = all }
+                } label: {
+                    CheckBox(on: chosen > 0, mixed: chosen > 0 && chosen < pending.count)
+                }
+                .buttonStyle(.plain)
+                .help(chosen < pending.count ? "全选" : "全不选")
+
+                Text("已选 \(chosen) / \(pending.count) 张").font(.system(size: 13)).monospacedDigit()
+                if inAnkiCount > 0 {
+                    HStack(spacing: 6) {
+                        Dot(color: Theme.ok)
+                        Text("\(inAnkiCount) 张已在 Anki").font(.system(size: 12)).foregroundStyle(Theme.text2).monospacedDigit()
+                    }
+                }
+                Spacer()
+                Text("牌组").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                deckMenu
+                Button {
+                    model.send(source.id)
+                } label: {
+                    if model.sending.contains(source.id) {
+                        HStack(spacing: 6) { ProgressView().controlSize(.small).tint(Theme.onInk); Text("正在送…") }
+                    } else {
+                        Text("送进 Anki")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(chosen == 0 || model.sending.contains(source.id) || busy)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(chosen == 0 || model.sending.contains(source.id) || busy)
         }
         .padding(.horizontal, 24)
-        .frame(height: 52)
+        .frame(height: 48)
         .background(Theme.bg)
+        .task(id: source.id) { model.refreshDecks() }
+    }
+
+    private var deckMenu: some View {
+        Menu {
+            Picker("送到哪个牌组", selection: Binding(get: { model.deckForSending },
+                                                   set: { model.chosenDeck = $0 == model.topDeck ? nil : $0 })) {
+                ForEach(model.deckChoices, id: \.self) { Text($0).tag($0) }
+            }
+            .pickerStyle(.inline)
+            Divider()
+            Text("默认「\(model.topDeck)」；你在 Anki 里自己建的「\(model.topDeck)::…」也列在这。")
+            Text("主题不建牌组，写进卡的标签。")
+        } label: {
+            Text(model.deckForSending).font(.system(size: 13))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("送到哪个牌组")
     }
 }
 
@@ -209,20 +243,27 @@ struct CardRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Button {
-                if !card.inAnki { card.selected.toggle() }
-            } label: {
-                CheckBox(on: card.inAnki || card.selected, dimmed: card.inAnki)
+            if card.inAnki {
+                Dot(color: Theme.ok)
+                    .frame(width: 16, height: 16)
+                    .padding(.top, 1)
+                    .help("已经在 Anki 里了")
+            } else {
+                Button {
+                    card.selected.toggle()
+                } label: {
+                    CheckBox(on: card.selected)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 1)
+                .help("勾上的送进 Anki")
             }
-            .buttonStyle(.plain)
-            .padding(.top, 1)
-            .help(card.inAnki ? "已经在 Anki 里了" : "勾上的送进 Anki")
 
             if editing { editor } else { content }
 
             VStack(spacing: 4) {
                 if card.inAnki {
-                    Text("已在 Anki").font(.system(size: 11)).foregroundStyle(Theme.text3).fixedSize()
+                    Text("已在 Anki").font(.system(size: 12)).foregroundStyle(Theme.text2).fixedSize()
                 }
                 if hover || editing {
                     HStack(spacing: 2) {

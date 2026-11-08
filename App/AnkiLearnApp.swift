@@ -25,6 +25,7 @@ struct AnkiLearnApp: App {
 
         Settings {
             SettingsView()
+                .environmentObject(model)
         }
     }
 }

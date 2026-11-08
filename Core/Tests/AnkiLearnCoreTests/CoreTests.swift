@@ -146,16 +146,47 @@ func makeRoot() throws -> URL {
 
     @Test func pointsForAnki() {
         #expect(AnkiHTML.points("只有一条 `x`") == "只有一条 <code>x</code>")
-        #expect(AnkiHTML.points("- 第一条\n\n• 第二条 <b>") == "<ul class=\"pts\"><li>第一条</li><li>第二条 &lt;b&gt;</li></ul>")
+        #expect(AnkiHTML.points("- 第一条\n\n• 第二条 <b>") == "<ul><li>第一条</li><li>第二条 &lt;b&gt;</li></ul>")
         #expect(AnkiHTML.points("") == "")
     }
 
     @Test func noteTypeIsVersioned() {
-        #expect(AnkiNoteType.css.hasPrefix("/* \(AnkiNoteType.version)"))
-        #expect(!AnkiNoteType.back.contains("id=\"answer\""))
-        for field in AnkiNoteType.fieldNames where field != "原文" && field != "补充" {
-            #expect(AnkiNoteType.back.contains("{{\(field)}}"))
+        #expect(StudyCard.version(ofCSS: StudyCard.css) == StudyCard.version)
+        #expect(StudyCard.version(ofCSS: "/* 卡片家族 v12 */\n.card {}") == 12)
+        #expect(StudyCard.version(ofCSS: "/* Anki Learn card · v2 · B 答案接棒 */") == nil)
+        #expect(StudyCard.version(ofCSS: ".card { color: red }") == nil)
+        #expect(StudyCard.version(ofCSS: "") == nil)
+        #expect(!StudyCard.back.contains("id=\"answer\""))
+        #expect(!StudyCard.back.contains("FrontSide"))
+        for field in StudyCard.fields where field != "ID" {
+            #expect(StudyCard.back.contains("{{\(field)}}") || StudyCard.back.contains("{{text:\(field)}}"))
         }
+        // ID 只拿来判重和找卡，不在卡上显示
+        #expect(!StudyCard.front.contains("{{ID}}") && !StudyCard.back.contains("{{ID}}"))
+        // 四个深色选择器都写了
+        for night in [".card.nightMode", ".nightMode .card", ".card.night_mode", ".night_mode .card"] {
+            #expect(StudyCard.css.contains(night))
+        }
+    }
+
+    @Test func chatCardsFieldsAndTags() {
+        var source = Source(kind: .claudeSession, title: "会话 <1>", origin: "x", link: "https://claude.ai/code/session_x?a=1&b=2")
+        let card = Card(CardDraft(q: "问 `x`", a: "答", more: "一\n二", quote: "原话", tags: ["git tips", "主题::macOS", " "]))
+        source.cards = [card]
+        let fields = ChatCardsNote.fields(for: card, source: source)
+        #expect(Set(fields.keys) == Set(StudyCard.fields))
+        #expect(fields["Question"] == "问 <code>x</code>")
+        #expect(fields["More"] == "<ul><li>一</li><li>二</li></ul>")
+        #expect(fields["Label"] == "ChatCards · Claude Code")
+        #expect(fields["Source"]?.hasPrefix("会话 &lt;1&gt; · ") == true)
+        #expect(fields["Source"]?.range(of: #" · \d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil)
+        #expect(fields["Link"] == "https://claude.ai/code/session_x?a=1&amp;b=2")
+        #expect(fields["ID"] == "chatcards-" + card.id.uuidString.lowercased())
+        #expect(ChatCardsNote.tags(for: card) == ["来自::ChatCards", "主题::git_tips", "主题::macOS"])
+        let doc = Source(kind: .document, title: "笔记", origin: "/tmp/笔记.pdf")
+        #expect(ChatCardsNote.fields(for: card, source: doc)["Label"] == "ChatCards · 文档")
+        #expect(ChatCardsNote.fields(for: card, source: doc)["Link"] == "")
+        #expect(AnkiConnect.query(for: [card]) == "\"ID:\(ChatCardsNote.noteID(card))\"")
     }
 
     @Test func htmlForAnki() {

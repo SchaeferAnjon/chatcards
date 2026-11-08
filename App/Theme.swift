@@ -55,16 +55,16 @@ struct QuietButtonStyle: ButtonStyle {
     }
 }
 
-/// 4 圆角的方形复选框，选中墨黑
+/// 4 圆角的方形复选框，选中墨黑；mixed 是全选框里「选了一部分」的横线
 struct CheckBox: View {
     let on: Bool
-    var dimmed = false
+    var mixed = false
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
-            .fill(on ? (dimmed ? Theme.text3 : Theme.ink) : .clear)
+            .fill(on ? Theme.ink : .clear)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(on ? .clear : Theme.line2, lineWidth: 1))
             .overlay {
-                if on { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.onInk) }
+                if on { Image(systemName: mixed ? "minus" : "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.onInk) }
             }
             .frame(width: 16, height: 16)
     }
@@ -74,4 +74,18 @@ struct CheckBox: View {
 struct Dot: View {
     let color: Color
     var body: some View { Circle().fill(color).frame(width: 7, height: 7) }
+}
+
+/// 有边框的次要按钮：和实心主按钮同高，放在同一行的其他动作
+struct OutlineButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13))
+            .foregroundStyle(enabled ? Theme.text : Theme.text3)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(configuration.isPressed ? Theme.sel : Theme.card, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.line2, lineWidth: 0.5))
+    }
 }

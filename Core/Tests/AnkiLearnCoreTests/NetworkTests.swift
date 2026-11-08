@@ -98,73 +98,129 @@ func deepSeekReply(_ content: String) -> [String: Any] {
         await #expect(throws: DeepSeekError.noKey) { _ = try await noKey.json(system: "json", user: "x") }
     }
 
-    @Test func ankiAddsNewSkipsDuplicates() async throws {
+    /// 假 Anki：笔记类型按 models 回答，记下建了什么、换了什么
+    func fakeAnki(models: [String: (fields: [String], css: String)], decks: [String: Int] = [:],
+                  canAdd: [[String: Any]] = [["canAdd": true]], added: [Any] = [1]) {
         StubProtocol.bodies = []
         StubProtocol.handler = { body in
+            let params = body["params"] as? [String: Any] ?? [:]
             switch body["action"] as? String {
             case "version": return (200, ["result": 6, "error": NSNull()])
-            case "createDeck": return (200, ["result": 1, "error": NSNull()])
-            case "modelNames": return (200, ["result": ["Basic"], "error": NSNull()])
-            case "createModel": return (200, ["result": [:], "error": NSNull()])
-            case "canAddNotesWithErrorDetail":
-                return (200, ["result": [["canAdd": true], ["canAdd": false, "error": "cannot create note because it is a duplicate"], ["canAdd": true]], "error": NSNull()])
-            case "addNotes": return (200, ["result": [111, NSNull()], "error": NSNull()])
+            case "deckNamesAndIds": return (200, ["result": decks, "error": NSNull()])
+            case "createDeck": return (200, ["result": 99, "error": NSNull()])
+            case "modelNames": return (200, ["result": Array(models.keys), "error": NSNull()])
+            case "modelFieldNames": return (200, ["result": models[params["modelName"] as? String ?? ""]?.fields ?? [], "error": NSNull()])
+            case "modelStyling": return (200, ["result": ["css": models[params["modelName"] as? String ?? ""]?.css ?? ""], "error": NSNull()])
+            case "createModel", "updateModelStyling", "updateModelTemplates": return (200, ["result": NSNull(), "error": NSNull()])
+            case "canAddNotesWithErrorDetail": return (200, ["result": canAdd, "error": NSNull()])
+            case "addNotes": return (200, ["result": added, "error": NSNull()])
             default: return (200, ["result": NSNull(), "error": "unknown action"])
             }
         }
+    }
+
+    var actions: [String] { StubProtocol.bodies.compactMap { $0["action"] as? String } }
+    func params(_ action: String) -> [String: Any]? {
+        StubProtocol.bodies.last { $0["action"] as? String == action }?["params"] as? [String: Any]
+    }
+
+    @Test func ankiAddsNewSkipsDuplicates() async throws {
+        fakeAnki(models: ["Basic": (["Front", "Back"], "")],
+                 canAdd: [["canAdd": true], ["canAdd": false, "error": "cannot create note because it is a duplicate"], ["canAdd": true]],
+                 added: [111, NSNull()])
         var source = Source(kind: .claudeSession, title: "会话 <1>", origin: "x", link: "https://claude.ai/code/session_x")
         source.cards = [Card(CardDraft(q: "新的", a: "`a`", tags: ["git tips"])), Card(CardDraft(q: "有了", a: "b")), Card(CardDraft(q: "坏的", a: "c"))]
         let anki = AnkiConnect(session: StubProtocol.session())
-        let result = try await anki.add(source.cards, from: source, deck: "Anki Learn::Claude Code")
+        let result = try await anki.add(source.cards, from: source, deck: "知识")
         #expect(result.added == [source.cards[0].id])
         #expect(result.duplicates == [source.cards[1].id])
         #expect(result.failed.keys.contains(source.cards[2].id))
 
-        let actions = StubProtocol.bodies.compactMap { $0["action"] as? String }
-        #expect(actions == ["version", "createDeck", "modelNames", "createModel", "canAddNotesWithErrorDetail", "addNotes"])
-        let added = try #require(StubProtocol.bodies.last?["params"] as? [String: Any])
-        let notes = try #require(added["notes"] as? [[String: Any]])
+        #expect(actions == ["version", "modelNames", "createModel", "canAddNotesWithErrorDetail", "addNotes"])
+        let model = try #require(params("createModel"))
+        #expect(model["modelName"] as? String == "学习卡 · 问答")
+        #expect(model["inOrderFields"] as? [String] == StudyCard.fields)
+        #expect((model["css"] as? String)?.hasPrefix("/* 卡片家族 v3 */") == true)
+        let notes = try #require(params("addNotes")?["notes"] as? [[String: Any]])
         #expect(notes.count == 2)
         let fields = try #require(notes[0]["fields"] as? [String: String])
-        #expect(fields["问题"] == "新的")
-        #expect(fields["答案"] == "<code>a</code>")
-        #expect(fields["来源"]?.contains("会话 &lt;1&gt;") == true)
-        #expect(fields["来源"]?.range(of: #"<span class="src-date">\d{4}-\d{2}-\d{2}</span>"#, options: .regularExpression) != nil)
-        #expect(fields["来源"]?.contains(#"<a class="src-link" href="https://claude.ai/code/session_x">打开原文</a>"#) == true)
-        #expect(notes[0]["tags"] as? [String] == ["anki-learn", "git_tips"])
-        #expect(notes[0]["deckName"] as? String == "Anki Learn::Claude Code")
+        #expect(fields["Question"] == "新的")
+        #expect(fields["Answer"] == "<code>a</code>")
+        #expect(fields["Label"] == "ChatCards · Claude Code")
+        #expect(fields["Link"] == "https://claude.ai/code/session_x")
+        #expect(notes[0]["tags"] as? [String] == ["来自::ChatCards", "主题::git_tips"])
+        #expect(notes[0]["deckName"] as? String == "知识")
+        #expect(notes[0]["modelName"] as? String == "学习卡 · 问答")
     }
 
-    @Test func ankiUpgradesOldNoteTypeOnce() async throws {
-        for (css, expectUpdate) in [("/* old */ .card {}", true), (AnkiNoteType.css, false)] {
-            StubProtocol.bodies = []
-            StubProtocol.handler = { body in
-                switch body["action"] as? String {
-                case "version": return (200, ["result": 6, "error": NSNull()])
-                case "createDeck": return (200, ["result": 1, "error": NSNull()])
-                case "modelNames": return (200, ["result": [AnkiNoteType.name], "error": NSNull()])
-                case "modelStyling": return (200, ["result": ["css": css], "error": NSNull()])
-                case "updateModelStyling", "updateModelTemplates": return (200, ["result": NSNull(), "error": NSNull()])
-                case "canAddNotesWithErrorDetail": return (200, ["result": [["canAdd": true]], "error": NSNull()])
-                case "addNotes": return (200, ["result": [1], "error": NSNull()])
-                default: return (200, ["result": NSNull(), "error": "unknown action"])
-                }
-            }
+    /// 只往新的换：Anki 里的旧了才换；比我们新（别的软件先更新了）不动；第一行不是版本号说明你改过，先问
+    @Test func ankiRestylesOnlyOlderVersions() async throws {
+        let ours = StudyCard.fields
+        let cases: [(css: String, choice: CustomizedStyle, restyle: Bool, asks: Bool)] = [
+            ("/* 卡片家族 v2 */\n.card {}", .ask, true, false),
+            (StudyCard.css, .ask, false, false),
+            ("/* 卡片家族 v4 */\n.card {}", .ask, false, false),
+            (".card { color: hotpink }", .ask, false, true),
+            (".card { color: hotpink }", .keep, false, false),
+            (".card { color: hotpink }", .replace, true, false),
+        ]
+        for c in cases {
+            fakeAnki(models: ["学习卡 · 问答": (ours, c.css)])
+            let anki = AnkiConnect(session: StubProtocol.session())
             let source = Source(kind: .document, title: "笔记.pdf", origin: "/tmp/笔记.pdf")
-            _ = try await AnkiConnect(session: StubProtocol.session()).add([Card(CardDraft(q: "q", a: "a"))], from: source, deck: "d")
-            let actions = StubProtocol.bodies.compactMap { $0["action"] as? String }
-            #expect(actions.contains("createModel") == false)
-            #expect(actions.contains("updateModelStyling") == expectUpdate)
-            #expect(actions.contains("updateModelTemplates") == expectUpdate)
-            if expectUpdate {
-                let t = try #require(StubProtocol.bodies.first { $0["action"] as? String == "updateModelTemplates" }?["params"] as? [String: Any])
-                let templates = try #require((t["model"] as? [String: Any])?["templates"] as? [String: [String: String]])
-                #expect(templates["问答"]?["Back"]?.contains("原话") == true)
+            if c.asks {
+                await #expect(throws: AnkiError.customizedStyle(model: "学习卡 · 问答")) {
+                    _ = try await anki.add([Card(CardDraft(q: "q", a: "a"))], from: source, deck: "知识", customized: c.choice)
+                }
+                #expect(!actions.contains("addNotes"))
+            } else {
+                _ = try await anki.add([Card(CardDraft(q: "q", a: "a"))], from: source, deck: "知识", customized: c.choice)
+                #expect(actions.contains("addNotes"))
             }
-            // 没有链接的文档：来源里没有「打开原文」
-            let added = try #require(StubProtocol.bodies.last?["params"] as? [String: Any])
-            let fields = try #require((added["notes"] as? [[String: Any]])?.first?["fields"] as? [String: String])
-            #expect(fields["来源"]?.contains("src-link") == false)
+            #expect(!actions.contains("createModel"))
+            #expect(actions.contains("updateModelStyling") == c.restyle, "css: \(c.css.prefix(20)) choice: \(c.choice)")
+            #expect(actions.contains("updateModelTemplates") == c.restyle)
+            if c.restyle {
+                let templates = try #require((params("updateModelTemplates")?["model"] as? [String: Any])?["templates"] as? [String: [String: String]])
+                #expect(templates["问答"]?["Back"] == StudyCard.back)
+            }
+        }
+    }
+
+    /// 你自己有个同名的笔记类型（字段对不上）：不碰它，建「学习卡 · 问答 2」
+    @Test func ankiLeavesSomeoneElsesNoteTypeAlone() async throws {
+        fakeAnki(models: ["学习卡 · 问答": (["正面", "背面"], ".card {}")])
+        let source = Source(kind: .web, title: "网页", origin: "https://example.com", link: "https://example.com")
+        _ = try await AnkiConnect(session: StubProtocol.session()).add([Card(CardDraft(q: "q", a: "a"))], from: source, deck: "知识")
+        #expect(params("createModel")?["modelName"] as? String == "学习卡 · 问答 2")
+        #expect(!actions.contains("updateModelStyling"))
+        let notes = try #require(params("addNotes")?["notes"] as? [[String: Any]])
+        #expect(notes[0]["modelName"] as? String == "学习卡 · 问答 2")
+    }
+
+    /// 牌组按 id 记：Anki 里改了名跟着走；删了就按名字重建
+    @Test func deckFollowsRenameById() async throws {
+        let anki = AnkiConnect(session: StubProtocol.session())
+        fakeAnki(models: [:], decks: ["Default": 1, "我的知识": 42])
+        var deck = try await anki.deck(id: 42, orCreate: "知识")
+        #expect(deck.name == "我的知识" && deck.id == 42)
+        #expect(!actions.contains("createDeck"))
+
+        fakeAnki(models: [:], decks: ["Default": 1, "知识": 7])
+        deck = try await anki.deck(id: 42, orCreate: "知识")
+        #expect(deck.name == "知识" && deck.id == 7)
+        #expect(!actions.contains("createDeck"))
+
+        fakeAnki(models: [:], decks: ["Default": 1])
+        deck = try await anki.deck(id: nil, orCreate: "知识")
+        #expect(deck.name == "知识" && deck.id == 99)
+        #expect(params("createDeck")?["deck"] as? String == "知识")
+    }
+
+    @Test func ankiEditorOpenIsReadable() async {
+        StubProtocol.handler = { _ in (200, ["result": NSNull(), "error": "Close the affected editor before this API write, even if its content is saved."]) }
+        await #expect(throws: AnkiError.api("Anki 里开着卡片浏览器或「添加」窗口，Anki 不让这时改笔记类型；关掉它再送")) {
+            _ = try await AnkiConnect(session: StubProtocol.session()).version()
         }
     }
 
