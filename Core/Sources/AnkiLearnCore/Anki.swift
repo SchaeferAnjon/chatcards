@@ -100,6 +100,8 @@ public enum StudyCard {
     .card code { font-family: var(--mono); font-size: .88em; padding: .08em .36em; border-radius: 5px; background: var(--surface); overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
     .card pre { font-family: var(--mono); font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface); padding: 12px 14px; border-radius: 8px; margin: 8px 0; }
     .card pre code { padding: 0; background: none; font-size: inherit; }
+    .card .code-h, .card .copy { display: none; }
+    .card .scrollx { overflow-x: auto; }
     .card b, .card strong { font-weight: 600; }
     .card a { color: var(--accent); text-decoration: none; }
     .card img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); display: block; }
