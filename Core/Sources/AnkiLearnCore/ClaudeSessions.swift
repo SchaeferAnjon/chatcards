@@ -31,8 +31,15 @@ public enum SessionReadError: LocalizedError {
 }
 
 public enum ClaudeSessions {
-    public static let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".claude/projects", isDirectory: true)
+    public static let defaultRoot: URL = {
+        if E2EMode.isOn {
+            if let raw = ProcessInfo.processInfo.environment["E2E_CLAUDE_DIR"], !raw.isEmpty {
+                return URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
+            }
+            return E2EMode.dataDirectory.appendingPathComponent("claude-projects", isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects", isDirectory: true)
+    }()
 
     /// 最近的会话，新的在前。不列：一句真正的提问都没有的，和 claude -p 脚本跑的（录音整理、designer 复审、起分支名这类）
     public static func list(root: URL = defaultRoot, limit: Int = 50) -> [SessionInfo] {

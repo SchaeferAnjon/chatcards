@@ -36,3 +36,5 @@ make install   # 编 Release，装到 /Applications/Anki Learn.app
 ```
 
 `project.yml`（XcodeGen）是唯一的工程定义，`AnkiLearn.xcodeproj` 不进 git。逻辑都在 `Core/`（Swift 包，能单独 `swift test`），界面在 `App/`（SwiftUI）。签名用 Apple Development（team TEAMID），重新编译后钥匙串里的 Key 照样能读。
+
+测试和调试时用测试模式 `E2E=1`（或启动参数 `-E2E 1`）启动：窗口不出现在屏幕上、不抢焦点、不进 Dock，访达、浏览器、打开 Anki、提示框、弹出菜单都只记一行不真做（`App/TestMode.swift`）；做过的卡片在临时目录（`E2E_DATA_DIR`），Claude 会话从 `E2E_CLAUDE_DIR` 读，AnkiConnect 连 `E2E_ANKI_URL`（都没给就是空的、连不上），偏好用单独的一份，Key 只放在内存里，不碰你的真数据和真 Anki（`Core/.../E2EMode.swift`）。`E2E_SNAPSHOT=<png>` 把主窗口画成图。验证脚本 `bash scripts/e2e-hidden-check.sh`：编 Debug 版、测试模式下启动，1、5、10 秒查屏幕上没有它的窗口，查截图，把会占屏幕的事各试一遍。

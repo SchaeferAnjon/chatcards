@@ -5,6 +5,11 @@ import SwiftUI
 struct AnkiLearnApp: App {
     @StateObject private var model = AppModel()
 
+    init() {
+        // 测试模式（E2E=1）：在读偏好、开窗口之前换好，见 TestMode
+        TestMode.install()
+    }
+
     var body: some Scene {
         // 只有一个主窗口：/anki 送来的链接也进这个窗口，不另开
         Window("Anki Learn", id: "main") {

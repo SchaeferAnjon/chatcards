@@ -15,7 +15,8 @@ final class AnkiCheck: ObservableObject {
     @Published var checkedOnce = false
 
     static var addonFolder: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        // 测试模式不看本机真的 Anki 插件目录
+        (E2EMode.isOn ? E2EMode.dataDirectory : FileManager.default.homeDirectoryForCurrentUser)
             .appendingPathComponent("Library/Application Support/Anki2/addons21/\(AnkiConnect.addonCode)")
     }
 

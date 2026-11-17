@@ -63,7 +63,8 @@ public struct SourceStore: Sendable {
     public init(url: URL) { self.url = url }
 
     public static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        if E2EMode.isOn { return E2EMode.dataDirectory.appendingPathComponent("sources.json") }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Anki Learn", isDirectory: true)
             .appendingPathComponent("sources.json")
     }

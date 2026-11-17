@@ -250,7 +250,10 @@ public enum AnkiHTML {
 
 /// AnkiConnect（Anki 的插件，只听本机 8765 端口）：发 {action, version, params}，回 {result, error}
 public struct AnkiConnect: Sendable {
-    public static let defaultURL = URL(string: "http://127.0.0.1:8765")!
+    /// 测试模式（E2EMode）连 E2E_ANKI_URL，没给就连没人听的端口：不往真的 Anki 里写
+    public static let defaultURL = E2EMode.isOn
+        ? E2EMode.url("E2E_ANKI_URL") ?? URL(string: "http://127.0.0.1:9")!
+        : URL(string: "http://127.0.0.1:8765")!
     /// AnkiConnect 在 AnkiWeb 上的编号，也是 addons21 下的文件夹名
     public static let addonCode = "2055492159"
 
