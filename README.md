@@ -6,7 +6,10 @@
 
 > 名字还会改：Anki 是 Ankitects 的注册商标，公开发布前这个应用会换一个不带「Anki」的名字。
 
-![做好的卡片：勾选、改好，再送进 Anki](docs/screenshots/cards-light.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/cards-dark.png">
+  <img alt="做好的卡片：勾选、改好，再送进 Anki" src="docs/screenshots/cards-light.png">
+</picture>
 
 ## 要什么
 

@@ -8,7 +8,10 @@ A Mac app that turns Claude Code sessions, PDFs, Markdown files and web pages in
 
 The interface is in Chinese for now.
 
-![Cards made from a session: tick, edit, send to Anki](docs/screenshots/cards-light.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/cards-dark.png">
+  <img alt="Cards made from a session: tick, edit, send to Anki" src="docs/screenshots/cards-light.png">
+</picture>
 
 ## What you need
 
