@@ -2,13 +2,18 @@
 
 APP = build/DerivedData/Build/Products/Release/Anki Learn.app
 
+# 签名：默认临时签名（ad-hoc）。给了 TEAM 就用这个 Team 的 Apple Development 证书签，
+# 重新编译后钥匙串里的 Key 照样能读。TEAM 可以写在 local.mk 里（不进 git）：TEAM = <Team ID>
+-include local.mk
+SIGN = $(if $(TEAM),DEVELOPMENT_TEAM=$(TEAM) CODE_SIGN_IDENTITY="Apple Development",)
+
 # XcodeGen 生成工程（brew install xcodegen）；工程文件不进 git
 generate:
 	xcodegen generate
 
 build: generate
 	xcodebuild -quiet -project AnkiLearn.xcodeproj -scheme AnkiLearn -configuration Release \
-	  -derivedDataPath build/DerivedData build
+	  -derivedDataPath build/DerivedData $(SIGN) build
 
 run: build
 	open "$(APP)"
@@ -17,7 +22,7 @@ run: build
 test:
 	cd Core && swift test
 
-# 装到 /Applications（自用）
+# 装到 /Applications
 install: build
 	osascript -e 'quit app "Anki Learn"' 2>/dev/null || true
 	rm -rf "/Applications/Anki Learn.app"
