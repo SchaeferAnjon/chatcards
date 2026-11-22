@@ -1,4 +1,4 @@
-import AnkiLearnCore
+import ChatCardsCore
 import SwiftUI
 
 struct SettingsView: View {

@@ -4,7 +4,7 @@ import Foundation
 public enum ImportTarget: Equatable, Sendable {
     /// claude.ai/code/session_<id> 链接
     case claudeLink(remoteID: String, url: URL)
-    /// 本机会话编号（ankilearn://session/<编号>，/anki 命令送来的）
+    /// 本机会话编号（chatcards://session/<编号>，/anki 命令送来的；改名前的 ankilearn:// 也认）
     case localSession(id: String)
     case file(URL)
     case web(URL)
@@ -20,7 +20,7 @@ public enum ImportTarget: Equatable, Sendable {
             let id = String(text[r])
             return .claudeLink(remoteID: id, url: URL(string: "https://claude.ai/code/session_\(id)")!)
         }
-        if let url = URL(string: text), url.scheme == "ankilearn", url.host == "session" {
+        if let url = URL(string: text), ["chatcards", "ankilearn"].contains(url.scheme ?? ""), url.host == "session" {
             let id = url.lastPathComponent
             return id.isEmpty || id == "/" ? nil : .localSession(id: id)
         }

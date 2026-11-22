@@ -1,4 +1,4 @@
-import AnkiLearnCore
+import ChatCardsCore
 import AppKit
 import SwiftUI
 
@@ -93,7 +93,7 @@ struct ConnectAnkiView: View {
     private var diagram: some View {
         VStack(spacing: 12) {
             HStack(spacing: 0) {
-                node(Image(nsImage: NSApp.applicationIconImage), "Anki Learn")
+                node(Image(nsImage: NSApp.applicationIconImage), "ChatCards")
                 wire
                 HStack(spacing: 6) {
                     Dot(color: check.connected ? Theme.ok : check.addonInstalled ? Theme.warn : Theme.text3)

@@ -1,12 +1,12 @@
 import Foundation
 import Testing
-@testable import AnkiLearnCore
+@testable import ChatCardsCore
 
 let fixtureID = "11111111-2222-3333-4444-555555555555"
 
 /// 测试用的 ~/.claude/projects：临时文件夹里放一个项目文件夹，里面是会话记录
 func makeRoot() throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("ankilearn-\(UUID().uuidString)")
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("chatcards-\(UUID().uuidString)")
     let project = root.appendingPathComponent("-Users-me-Projects-demo")
     try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
     let fixture = Bundle.module.url(forResource: "Fixtures/\(fixtureID)", withExtension: "jsonl")!
@@ -84,6 +84,7 @@ func makeRoot() throws -> URL {
     @Test func recognisesWhatWasPasted() {
         #expect(ImportTarget.parse("  https://claude.ai/code/session_01AbCdEfGhIjKlMnOpQrStUv \n")
                 == .claudeLink(remoteID: "01AbCdEfGhIjKlMnOpQrStUv", url: URL(string: "https://claude.ai/code/session_01AbCdEfGhIjKlMnOpQrStUv")!))
+        #expect(ImportTarget.parse("chatcards://session/11111111-2222-3333-4444-555555555555") == .localSession(id: "11111111-2222-3333-4444-555555555555"))
         #expect(ImportTarget.parse("ankilearn://session/11111111-2222-3333-4444-555555555555") == .localSession(id: "11111111-2222-3333-4444-555555555555"))
         #expect(ImportTarget.parse("ABCDEF11-2222-3333-4444-55555555555A") == .localSession(id: "abcdef11-2222-3333-4444-55555555555a"))
         #expect(ImportTarget.parse("/tmp/a b.pdf") == .file(URL(fileURLWithPath: "/tmp/a b.pdf")))
@@ -194,7 +195,7 @@ func makeRoot() throws -> URL {
     }
 
     @Test func storeRoundTrip() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ankilearn-store-\(UUID().uuidString)/sources.json")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("chatcards-store-\(UUID().uuidString)/sources.json")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         var source = Source(kind: .claudeSession, title: "会话", origin: fixtureID, link: "https://claude.ai/code/session_x")
         source.cards = [Card(CardDraft(q: "问", a: "答"))]

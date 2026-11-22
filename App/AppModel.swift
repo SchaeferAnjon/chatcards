@@ -1,5 +1,5 @@
 import AppKit
-import AnkiLearnCore
+import ChatCardsCore
 import SwiftUI
 
 /// 设置里的几项（UserDefaults）
@@ -99,12 +99,50 @@ final class AppModel: ObservableObject {
     private var toastTask: Task<Void, Never>?
 
     init() {
+        let moved = Self.migrateFromAnkiLearn()
         do {
             sources = try store.load()
         } catch {
             show(Toast(ok: false, title: "读不了以前做的卡片", detail: error.localizedDescription))
         }
+        switch moved {
+        case .success(let report) where !report.isEmpty:
+            var parts: [String] = []
+            if report.sources > 0 { parts.append("\(report.sources) 份做过的材料") }
+            if report.key { parts.append("DeepSeek Key") }
+            if !report.settings.isEmpty { parts.append("设置") }
+            show(Toast(ok: true, title: "从 Anki Learn 搬过来了", detail: parts.joined(separator: "、") + "都在。Anki Learn 那边的没删。"))
+        case .failure(let error):
+            show(Toast(ok: false, title: "没能从 Anki Learn 搬来做过的卡片", detail: "下次打开再试。\(error.localizedDescription)"))
+        default:
+            break
+        }
         refreshSessions()
+    }
+
+    /// 以前叫 Anki Learn：第一次启动把旧版的卡片、设置和 Key 搬过来，只复制不删（见 LegacyMigration）。
+    /// 测试模式下只在给了 E2E_LEGACY_SUPPORT 时搬，旧数据从测试给的地方读，不碰钥匙串（读别的程序存的条目系统会弹窗）：
+    /// E2E_LEGACY_SUPPORT（放 sources.json 的文件夹）、E2E_LEGACY_DEFAULTS（defaults 的名字，可以是 plist 的绝对路径）、E2E_LEGACY_KEY（旧版的 Key）
+    private static func migrateFromAnkiLearn() -> Result<LegacyMigration.Report, Error> {
+        let env = ProcessInfo.processInfo.environment
+        let oldSupport: URL, oldDefaults: UserDefaults?, oldKey: () -> String
+        if E2EMode.isOn {
+            guard let dir = env["E2E_LEGACY_SUPPORT"], !dir.isEmpty else { return .success(.init()) }
+            oldSupport = URL(fileURLWithPath: dir, isDirectory: true)
+            oldDefaults = env["E2E_LEGACY_DEFAULTS"].flatMap { UserDefaults(suiteName: $0) }
+            oldKey = { env["E2E_LEGACY_KEY"] ?? "" }
+        } else {
+            oldSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent(LegacyMigration.oldFolderName, isDirectory: true)
+            oldDefaults = UserDefaults(suiteName: LegacyMigration.oldBundleID)
+            oldKey = { KeychainItem(service: LegacyMigration.oldBundleID, account: LegacyMigration.keyAccount).read() }
+        }
+        return Result {
+            try LegacyMigration.run(
+                oldSupport: oldSupport, newSupport: SourceStore.defaultURL.deletingLastPathComponent(),
+                oldDefaults: oldDefaults, newDefaults: .standard,
+                oldKey: oldKey, currentKey: Keychain.read, saveKey: Keychain.save)
+        }
     }
 
     func source(_ id: UUID) -> Source? { sources.first { $0.id == id } }

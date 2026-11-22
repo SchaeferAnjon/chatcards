@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "AnkiLearnCore",
+    name: "ChatCardsCore",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "AnkiLearnCore", targets: ["AnkiLearnCore"]),
+        .library(name: "ChatCardsCore", targets: ["ChatCardsCore"]),
     ],
     targets: [
-        .target(name: "AnkiLearnCore", path: "Sources/AnkiLearnCore"),
+        .target(name: "ChatCardsCore", path: "Sources/ChatCardsCore"),
         .testTarget(
-            name: "AnkiLearnCoreTests",
-            dependencies: ["AnkiLearnCore"],
-            path: "Tests/AnkiLearnCoreTests",
+            name: "ChatCardsCoreTests",
+            dependencies: ["ChatCardsCore"],
+            path: "Tests/ChatCardsCoreTests",
             resources: [.copy("Fixtures")]
         ),
     ]

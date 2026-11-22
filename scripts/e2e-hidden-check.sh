@@ -1,12 +1,12 @@
 #!/bin/bash
 # 测试模式（E2E=1）验证：窗口不出现在屏幕上。
-# 起一个测试模式的 Anki Learn（直接跑包里的可执行文件，装着的正式版开着也不碰它）→ 启动后 1、5、10 秒各查一次屏幕上有没有它看得见的窗口
+# 起一个测试模式的 ChatCards（直接跑包里的可执行文件，装着的正式版开着也不碰它）→ 启动后 1、5、10 秒各查一次屏幕上有没有它看得见的窗口
 # → 把主窗口画成 PNG（E2E_SNAPSHOT），看不是空图 → 4 秒时探针（E2E_PROBE）把开窗口、改大小、激活、开网址、弹菜单、提示框、
 # 打开面板等各真做一遍，看都拦住了 → 结束进程。有一项不对退出码 1。
 #
-# 用法：bash scripts/e2e-hidden-check.sh [--app "<Anki Learn.app>"] [--shot <png>]
-#   不给 --app 就先编 Debug 版（不签名）到 /private/tmp/ankilearn-e2e-dd，跑完从启动服务里注销这份
-#   （它和正式版同一个 bundle id、同一个 ankilearn:// 链接，留着登记的话 /anki 送来的链接可能被它接走）
+# 用法：bash scripts/e2e-hidden-check.sh [--app "<ChatCards.app>"] [--shot <png>]
+#   不给 --app 就先编 Debug 版（不签名）到 /private/tmp/chatcards-e2e-dd，跑完从启动服务里注销这份
+#   （它和正式版同一个 bundle id、同一个 chatcards:// 链接，留着登记的话 /anki 送来的链接可能被它接走）
 #   --shot：把截到的主窗口图拷到这里，不给就只留在临时目录里给你看路径（脚本结束时连临时目录一起删）
 set -euo pipefail
 
@@ -22,18 +22,18 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$APP" ]; then
-    DD=/private/tmp/ankilearn-e2e-dd
+    DD=/private/tmp/chatcards-e2e-dd
     echo "编 Debug 版到 $DD ..."
     (cd "$ROOT" && xcodegen generate --quiet)
-    xcodebuild -project "$ROOT/AnkiLearn.xcodeproj" -scheme AnkiLearn -configuration Debug -derivedDataPath "$DD" \
+    xcodebuild -project "$ROOT/ChatCards.xcodeproj" -scheme ChatCards -configuration Debug -derivedDataPath "$DD" \
         -destination "platform=macOS,arch=$(uname -m)" CODE_SIGNING_ALLOWED=NO -quiet build
-    APP="$DD/Build/Products/Debug/Anki Learn.app"
+    APP="$DD/Build/Products/Debug/ChatCards.app"
     BUILT_HERE=1
 fi
 BIN="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Contents/Info.plist")"
 [ -x "$BIN" ] || { echo "找不到 $BIN" >&2; exit 2; }
 
-WORK="$(mktemp -d /private/tmp/ankilearn-e2e.XXXXXX)"
+WORK="$(mktemp -d /private/tmp/chatcards-e2e.XXXXXX)"
 PID=""
 cleanup() {
     if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
@@ -99,7 +99,7 @@ SHOT="$WORK/main.png"
 START=$(date +%s)
 E2E=1 E2E_DATA_DIR="$DATA" E2E_SNAPSHOT="$SHOT" E2E_PROBE=1 "$BIN" > "$WORK/app.log" 2>&1 &
 PID=$!
-echo "测试模式的 Anki Learn 起来了，pid $PID，数据目录 $DATA"
+echo "测试模式的 ChatCards 起来了，pid $PID，数据目录 $DATA"
 
 for at in 1 5 10; do
     while [ $(( $(date +%s) - START )) -lt "$at" ]; do sleep 0.2; done

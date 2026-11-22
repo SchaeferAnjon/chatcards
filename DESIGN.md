@@ -1,4 +1,6 @@
-# Anki Learn（ChatCards）界面标准
+# ChatCards 界面标准
+
+ChatCards 以前叫 Anki Learn（2026-11-22 改名）。
 
 ## 往 Anki 里加卡
 
@@ -46,7 +48,7 @@
 - 单词卡在纸上照「句子在前」：正面那句话 24 号、查的词套取景框；翻过来译文接在句子下面，细线下面「这句里的意思」30 / 600，再一行词、音标、词性，用法例句和截图收进折叠。
 - 颜色全部走 `.card` 上的变量（`--bg --surface --text --text2 --text3 --border --accent --backdrop --sheet --band --shadow`），深色在 `.card.nightMode, .nightMode .card, .card.night_mode, .night_mode .card` 四个选择器里重写；模板里不写死颜色。`--accent` 只给链接和单词的取景框。能读的字最少用 `--text2`。
 - 不用 `id="answer"`、不用 `{{FrontSide}}`，正面不垂直居中，翻面不跳。
-- 「学习卡 · 问答」的模板和样式原文在 anki-learn 的 `Core/Sources/AnkiLearnCore/Anki.swift`（`StudyCard`），三个软件里的副本要一字不差（Ask Free 在 `AskFreeCore/…/AnkiConnect.swift`，GetNewWord 在 `GetNewWord/Services/StudyCard.swift`）；样式第一行 `/* 卡片家族 v3 */`。模板里的固定字（原文、当时的画面、打开原文）是中文，共用一份，不跟界面语言变。
+- 「学习卡 · 问答」的模板和样式原文在 anki-learn 的 `Core/Sources/ChatCardsCore/Anki.swift`（`StudyCard`），三个软件里的副本要一字不差（Ask Free 在 `AskFreeCore/…/AnkiConnect.swift`，GetNewWord 在 `GetNewWord/Services/StudyCard.swift`）；样式第一行 `/* 卡片家族 v3 */`。模板里的固定字（原文、当时的画面、打开原文）是中文，共用一份，不跟界面语言变。
 - GetNewWord 自己的「GetNewWord」「GetNewWord Snippet」两个笔记类型也放在同一张纸上（外层 `.paper`），样式第一行 `/* GetNewWord card · v3 */`，同样只往新的换。
 
 ### 软件里和 Anki 有关的界面

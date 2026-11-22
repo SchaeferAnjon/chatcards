@@ -19,7 +19,7 @@ public enum E2EMode {
             return URL(fileURLWithPath: (dir as NSString).expandingTildeInPath, isDirectory: true)
         }
         return FileManager.default.temporaryDirectory
-            .appendingPathComponent("AnkiLearn-e2e-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+            .appendingPathComponent("ChatCards-e2e-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
     }()
 
     static func url(_ name: String) -> URL? {

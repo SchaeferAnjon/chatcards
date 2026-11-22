@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct AnkiLearnApp: App {
+struct ChatCardsApp: App {
     @StateObject private var model = AppModel()
 
     init() {
@@ -12,7 +12,7 @@ struct AnkiLearnApp: App {
 
     var body: some Scene {
         // 只有一个主窗口：/anki 送来的链接也进这个窗口，不另开
-        Window("Anki Learn", id: "main") {
+        Window("ChatCards", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 820, minHeight: 540)

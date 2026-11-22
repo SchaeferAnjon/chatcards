@@ -65,7 +65,7 @@ public struct SourceStore: Sendable {
     public static var defaultURL: URL {
         if E2EMode.isOn { return E2EMode.dataDirectory.appendingPathComponent("sources.json") }
         return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Anki Learn", isDirectory: true)
+            .appendingPathComponent("ChatCards", isDirectory: true)
             .appendingPathComponent("sources.json")
     }
 

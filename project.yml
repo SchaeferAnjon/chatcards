@@ -1,37 +1,37 @@
-name: AnkiLearn
+name: ChatCards
 options:
-  bundleIdPrefix: com.ankilearn
+  bundleIdPrefix: io.github.schaeferanjon
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
 packages:
-  AnkiLearnCore:
+  ChatCardsCore:
     path: Core
 targets:
-  AnkiLearn:
+  ChatCards:
     type: application
     platform: macOS
     sources:
       - path: App
     dependencies:
-      - package: AnkiLearnCore
-        product: AnkiLearnCore
+      - package: ChatCardsCore
+        product: ChatCardsCore
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Anki Learn
+        CFBundleDisplayName: ChatCards
         CFBundleDevelopmentRegion: zh-Hans
         CFBundleLocalizations: [zh-Hans]
         LSApplicationCategoryType: public.app-category.education
         CFBundleURLTypes:
-          - CFBundleURLName: com.ankilearn.app
-            CFBundleURLSchemes: [ankilearn]
+          - CFBundleURLName: io.github.schaeferanjon.chatcards
+            CFBundleURLSchemes: [chatcards, ankilearn]
     settings:
       base:
-        PRODUCT_NAME: Anki Learn
-        EXECUTABLE_NAME: AnkiLearn
-        PRODUCT_MODULE_NAME: AnkiLearn
-        PRODUCT_BUNDLE_IDENTIFIER: com.ankilearn.app
+        PRODUCT_NAME: ChatCards
+        EXECUTABLE_NAME: ChatCards
+        PRODUCT_MODULE_NAME: ChatCards
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.schaeferanjon.chatcards
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"

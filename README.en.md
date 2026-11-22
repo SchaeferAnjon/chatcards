@@ -1,10 +1,10 @@
-# Anki Learn
+# ChatCards
 
 [中文](README.md)
 
 A Mac app that turns Claude Code sessions, PDFs, Markdown files and web pages into Anki cards. DeepSeek reads the material and picks out what is worth remembering as question and answer cards; you review, edit and tick them in the app, then send them to Anki in one click.
 
-> The name will change: Anki is a registered trademark of Ankitects, so this app gets a name without "Anki" before its public release.
+> Formerly Anki Learn. If you used Anki Learn, the first launch of ChatCards brings over your cards, settings and DeepSeek key; see "Where your data lives".
 
 The interface is in Chinese for now.
 
@@ -25,8 +25,8 @@ There is no prebuilt download yet. Build it from source:
 
 ```bash
 brew install xcodegen      # Xcode is needed as well
-git clone <this repository> && cd anki-learn
-make install               # builds Release and copies it to /Applications/Anki Learn.app
+git clone https://github.com/SchaeferAnjon/chatcards.git && cd chatcards
+make install               # builds Release and copies it to /Applications/ChatCards.app
 ```
 
 On first launch, enter your DeepSeek key in Settings. The Anki page in Settings checks, line by line, whether Anki is installed, whether AnkiConnect is installed and whether Anki is running, and offers a button for whichever step is missing.
@@ -45,7 +45,7 @@ On first launch, enter your DeepSeek key in Settings. The Anki page in Settings 
 - The default model is `deepseek-flash` with thinking on (Settings can switch to `deepseek-v4-pro` or turn thinking off). A session of 11,000 tokens took 49 seconds and gave 14 cards.
 - Long material is split into pieces of 120,000 characters, up to 3 sent at a time; cards with the same question are kept once.
 - Only the conversation itself is read: what you wrote and what the AI answered. Tool calls, tool results, thinking, sub-agents, system reminders and compaction summaries are left out.
-- One idea per card, a question that makes sense outside the conversation, an answer of about 40 Chinese characters at most, and one quoted line from the source. The prompt is in `Core/Sources/AnkiLearnCore/CardMaker.swift`.
+- One idea per card, a question that makes sense outside the conversation, an answer of about 40 Chinese characters at most, and one quoted line from the source. The prompt is in `Core/Sources/ChatCardsCore/CardMaker.swift`.
 
 ## Sending to Anki
 
@@ -58,9 +58,10 @@ On first launch, enter your DeepSeek key in Settings. The Anki page in Settings 
 
 ## Where your data lives
 
-- DeepSeek API key: the login keychain (service `com.ankilearn.app`); it is only sent to `api.deepseek.com`.
-- Sources and cards: `~/Library/Application Support/Anki Learn/sources.json`.
-- Settings: `defaults read com.ankilearn.app`.
+- DeepSeek API key: the login keychain (service `io.github.schaeferanjon.chatcards`); it is only sent to `api.deepseek.com`.
+- Sources and cards: `~/Library/Application Support/ChatCards/sources.json`.
+- Settings: `defaults read io.github.schaeferanjon.chatcards`.
+- Coming from Anki Learn: the first launch copies `~/Library/Application Support/Anki Learn/sources.json`, the `com.ankilearn.app` settings and the key in the keychain. Nothing ChatCards already has is overwritten, and nothing on the Anki Learn side is deleted. macOS may ask once whether ChatCards may use the keychain item com.ankilearn.app; choose Allow or Always Allow. If you deny it, enter the key again in Settings. Afterwards you can delete `/Applications/Anki Learn.app`.
 - Your conversations and files are only sent to DeepSeek; cards go into your Anki only through the local AnkiConnect (`127.0.0.1:8765`). No account, no analytics.
 
 ## Development
@@ -68,11 +69,13 @@ On first launch, enter your DeepSeek key in Settings. The Anki page in Settings 
 ```bash
 make test      # core tests: reading sessions, splitting, parsing cards, DeepSeek and AnkiConnect requests (fake servers)
 make build     # Release build into build/
-make install   # Release build, copied to /Applications/Anki Learn.app
+make install   # Release build, copied to /Applications/ChatCards.app
 ```
 
-- `project.yml` (XcodeGen) is the only project definition; `AnkiLearn.xcodeproj` is not in git. Logic lives in `Core/` (a Swift package, testable on its own with `swift test`), the interface in `App/` (SwiftUI). Interface rules are in `DESIGN.md` (Chinese).
+- `project.yml` (XcodeGen) is the only project definition; `ChatCards.xcodeproj` is not in git. Logic lives in `Core/` (a Swift package, testable on its own with `swift test`), the interface in `App/` (SwiftUI). Interface rules are in `DESIGN.md` (Chinese).
 - Builds are ad-hoc signed by default, so anyone can build. With ad-hoc signing the keychain asks again for access to the key after every rebuild; signing with your own Apple Development certificate avoids that: `make install TEAM=<your Team ID>`, or create `local.mk` in the repository root (ignored by git) with the line `TEAM = <your Team ID>`.
+
+- For testing and debugging, launch in test mode with `E2E=1` (or the launch argument `-E2E 1`): no window on screen, no focus stealing, no Dock icon; Finder, browser, opening Anki, alerts and pop-up menus are only logged (`App/TestMode.swift`). Cards live in a temporary folder (`E2E_DATA_DIR`), Claude sessions are read from `E2E_CLAUDE_DIR`, AnkiConnect goes to `E2E_ANKI_URL` (empty and unreachable when not given), preferences are a separate set and the key stays in memory, so your real data and your real Anki are never touched (`Core/Sources/ChatCardsCore/E2EMode.swift`). `E2E_SNAPSHOT=<png>` renders the main window to an image. `bash scripts/e2e-hidden-check.sh` builds a Debug copy, launches it in test mode, checks at 1, 5 and 10 seconds that no window is on screen, checks the snapshot and tries every action that could take over the screen.
 
 ## License
 

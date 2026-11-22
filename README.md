@@ -1,10 +1,10 @@
-# Anki Learn
+# ChatCards
 
 [English](README.en.md)
 
 把 Claude Code 会话、PDF、Markdown 和网页做成 Anki 卡片的 Mac 应用。DeepSeek 读一遍内容，挑出值得长期记住的知识点做成问答卡；你在应用里看过、改好、勾好，再一键送进 Anki。
 
-> 名字还会改：Anki 是 Ankitects 的注册商标，公开发布前这个应用会换一个不带「Anki」的名字。
+> 以前叫 Anki Learn。从 Anki Learn 换过来的，第一次打开 ChatCards 会把做过的卡片、设置和 DeepSeek Key 搬过来，见「数据放在哪」。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/cards-dark.png">
@@ -23,8 +23,8 @@
 
 ```bash
 brew install xcodegen      # 还要装好 Xcode
-git clone <本仓库地址> && cd anki-learn
-make install               # 编 Release，装到 /Applications/Anki Learn.app
+git clone https://github.com/SchaeferAnjon/chatcards.git && cd chatcards
+make install               # 编 Release，装到 /Applications/ChatCards.app
 ```
 
 第一次打开，在「设置」里填 DeepSeek 的 Key。设置里的「Anki」页会一行一行查：Anki 装了没有、AnkiConnect 插件装了没有、Anki 开着没有，缺哪一步就给哪一步的按钮。
@@ -43,7 +43,7 @@ make install               # 编 Release，装到 /Applications/Anki Learn.app
 - 模型默认 `deepseek-flash`，开着思考（设置里可换 `deepseek-v4-pro`、关思考）。实测一段 1.1 万 token 的会话 49 秒出 14 张卡。
 - 长内容按 12 万字一段切开，最多 3 段同时发；问题一样的卡只留一张。
 - 只读对话本身：你说的和 AI 的回答。工具调用、工具结果、思考过程、子 Agent、系统提醒、压缩摘要都去掉。
-- 一张卡一个点，问题离开对话也看得懂，答案尽量不超过 40 字，带一句原文。提示词在 `Core/Sources/AnkiLearnCore/CardMaker.swift`。
+- 一张卡一个点，问题离开对话也看得懂，答案尽量不超过 40 字，带一句原文。提示词在 `Core/Sources/ChatCardsCore/CardMaker.swift`。
 
 ## 送进 Anki
 
@@ -56,9 +56,10 @@ make install               # 编 Release，装到 /Applications/Anki Learn.app
 
 ## 数据放在哪
 
-- DeepSeek API Key：登录钥匙串（service `com.ankilearn.app`），只发给 `api.deepseek.com`。
-- 做过的材料和卡片：`~/Library/Application Support/Anki Learn/sources.json`。
-- 设置：`defaults read com.ankilearn.app`。
+- DeepSeek API Key：登录钥匙串（service `io.github.schaeferanjon.chatcards`），只发给 `api.deepseek.com`。
+- 做过的材料和卡片：`~/Library/Application Support/ChatCards/sources.json`。
+- 设置：`defaults read io.github.schaeferanjon.chatcards`。
+- 从 Anki Learn 换过来：第一次打开时把 `~/Library/Application Support/Anki Learn/sources.json`、`com.ankilearn.app` 的设置和钥匙串里的 Key 复制过来，ChatCards 这边已经有的不覆盖，Anki Learn 那边的不删。读旧 Key 时 macOS 可能问一次「ChatCards 想使用钥匙串里的 com.ankilearn.app」，点「允许」或「始终允许」；点了拒绝就在设置里重新填 Key。搬完以后可以删掉 `/Applications/Anki Learn.app`。
 - 你的对话和文件内容只发给 DeepSeek；卡片只经本机的 AnkiConnect（`127.0.0.1:8765`）写进你的 Anki。没有账号，没有统计。
 
 ## 开发
@@ -66,11 +67,13 @@ make install               # 编 Release，装到 /Applications/Anki Learn.app
 ```bash
 make test      # 核心库测试：读会话、切段、解析卡片、DeepSeek 和 AnkiConnect 请求（假服务器）
 make build     # 编 Release 到 build/
-make install   # 编 Release，装到 /Applications/Anki Learn.app
+make install   # 编 Release，装到 /Applications/ChatCards.app
 ```
 
-- `project.yml`（XcodeGen）是唯一的工程定义，`AnkiLearn.xcodeproj` 不进 git。逻辑都在 `Core/`（Swift 包，能单独 `swift test`），界面在 `App/`（SwiftUI）。界面规范在 `DESIGN.md`。
+- `project.yml`（XcodeGen）是唯一的工程定义，`ChatCards.xcodeproj` 不进 git。逻辑都在 `Core/`（Swift 包，能单独 `swift test`），界面在 `App/`（SwiftUI）。界面规范在 `DESIGN.md`。
 - 默认用临时签名（ad-hoc）编，谁都能编。临时签名每次重新编译后，钥匙串会再问一次能不能读 Key；用你自己的 Apple Development 证书签就不会：`make install TEAM=<你的 Team ID>`，或者在仓库根目录建一个 `local.mk`（不进 git），写一行 `TEAM = <你的 Team ID>`。
+
+- 测试和调试用测试模式 `E2E=1`（或启动参数 `-E2E 1`）启动：窗口不出现在屏幕上、不抢焦点、不进 Dock，访达、浏览器、打开 Anki、提示框、弹出菜单都只记一行不真做（`App/TestMode.swift`）；做过的卡片在临时目录（`E2E_DATA_DIR`），Claude 会话从 `E2E_CLAUDE_DIR` 读，AnkiConnect 连 `E2E_ANKI_URL`（都没给就是空的、连不上），偏好用单独的一份，Key 只放在内存里，不碰你的真数据和真 Anki（`Core/Sources/ChatCardsCore/E2EMode.swift`）。`E2E_SNAPSHOT=<png>` 把主窗口画成图。验证脚本 `bash scripts/e2e-hidden-check.sh`：编 Debug 版、测试模式下启动，1、5、10 秒查屏幕上没有它的窗口，查截图，把会占屏幕的事各试一遍。
 
 ## 许可证
 

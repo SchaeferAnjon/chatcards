@@ -1,4 +1,4 @@
-import AnkiLearnCore
+import ChatCardsCore
 import AppKit
 import ObjectiveC
 
@@ -13,7 +13,7 @@ import ObjectiveC
 enum TestMode {
     static let isOn = E2EMode.isOn
 
-    /// 做过的卡片、日志都在这里（E2E_DATA_DIR，没给就是系统临时目录下的 AnkiLearn-e2e-<pid>）
+    /// 做过的卡片、日志都在这里（E2E_DATA_DIR，没给就是系统临时目录下的 ChatCards-e2e-<pid>）
     static var dataDirectory: URL { E2EMode.dataDirectory }
 
     private static let environment = ProcessInfo.processInfo.environment
@@ -40,7 +40,7 @@ enum TestMode {
         }
     }
 
-    /// AnkiLearnApp.init 里、读偏好和开窗口之前调：在 NSApplication 建好、任何窗口和偏好用到之前换掉
+    /// ChatCardsApp.init 里、读偏好和开窗口之前调：在 NSApplication 建好、任何窗口和偏好用到之前换掉
     @MainActor static func install() {
         guard isOn else { return }
         isolateDefaults()

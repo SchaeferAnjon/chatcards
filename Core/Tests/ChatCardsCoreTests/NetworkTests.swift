@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AnkiLearnCore
+@testable import ChatCardsCore
 
 /// 假服务器：每个请求交给 handler，回它给的状态码和内容；收到的请求体都记下来
 final class StubProtocol: URLProtocol, @unchecked Sendable {
